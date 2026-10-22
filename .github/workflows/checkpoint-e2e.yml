@@ -1,0 +1,31 @@
+name: GH_ADDMIN_POVIDER checkpoint E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  github-hosted-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bounded connector proof
+        run: |
+          test -f checkpoint-proof/GH_ADDMIN_POVIDER_2026-10-22.txt
+          grep -F "GH_ADDMIN_POVIDER connector write proof" checkpoint-proof/GH_ADDMIN_POVIDER_2026-10-22.txt
+          git rev-parse HEAD
+
+  existing-runner-proof:
+    runs-on: [self-hosted, wave-runner-01]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify existing runner identity
+        run: |
+          echo "runner=${RUNNER_NAME}"
+          test -n "${RUNNER_NAME}"
+          git rev-parse HEAD
