@@ -40,6 +40,7 @@ jobs:
           set -euo pipefail
           set +x
           test -n "${GIT_HUB_RUNNER_2:-}" || { echo "::error::GIT_HUB_RUNNER_2 missing"; exit 1; }
+          test -n "${GITHUB_TOKEN_OGE34:-}" || { echo "::error::GH1 read token reference missing"; exit 1; }
           api() {
             curl --fail-with-body --silent --show-error               -H "Accept: application/vnd.github+json"               -H "Authorization: Bearer ${GIT_HUB_RUNNER_2}"               -H "X-GitHub-Api-Version: 2022-11-28"               "$@"
           }
@@ -52,8 +53,9 @@ jobs:
           else
             echo "::error::Target repository preflight returned HTTP $status"; exit 1
           fi
-          auth="$(printf 'x-access-token:%s' "$GIT_HUB_RUNNER_2" | base64 -w0)"
-          git -c "http.extraHeader=Authorization: Basic $auth" clone --mirror             "https://github.com/${SOURCE_REPOSITORY}.git" "$RUNNER_TEMP/source.git"
-          git -C "$RUNNER_TEMP/source.git"             -c "http.extraHeader=Authorization: Basic $auth" push --mirror             "https://github.com/${TARGET_REPOSITORY}.git"
-          unset auth
+          source_auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN_OGE34" | base64 -w0)"
+          target_auth="$(printf 'x-access-token:%s' "$GIT_HUB_RUNNER_2" | base64 -w0)"
+          git -c "http.extraHeader=Authorization: Basic $source_auth" clone --mirror             "https://github.com/${SOURCE_REPOSITORY}.git" "$RUNNER_TEMP/source.git"
+          git -C "$RUNNER_TEMP/source.git"             -c "http.extraHeader=Authorization: Basic $target_auth" push --mirror             "https://github.com/${TARGET_REPOSITORY}.git"
+          unset source_auth target_auth
           echo "PRIVATE_MIRROR=PASS"
