@@ -1,4 +1,5 @@
 GH_ADDMIN_POVIDER connector write proof
 Environment: staging-safe GH2-owned test repository
 Date: 2026-10-22 Asia/Bangkok
+Branch, file, PR, merge, and push trigger exercised.
 No secrets. No production changes.
