@@ -20,7 +20,6 @@ jobs:
       TARGET_HOST: 165.232.174.32
     steps:
       - uses: actions/checkout@v4
-
       - name: Load staging secret references through Infisical OIDC
         uses: Infisical/secrets-action@v1.0.9
         with:
@@ -33,29 +32,41 @@ jobs:
           domain: https://app.infisical.com
           export-type: env
           include-imports: true
-
       - name: Validate required bindings without disclosure
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${SSH_PRIVATE_KEY:-}" || { echo "::error::SSH_PRIVATE_KEY missing"; exit 1; }
           test -n "${GIT_HUB_RUNNER_2:-}" || { echo "::error::GIT_HUB_RUNNER_2 missing"; exit 1; }
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] && [ -z "${SSH_KEY:-}" ]; then
+            echo "::error::No SSH key binding available"; exit 1
+          fi
           echo "INFISICAL_BINDINGS=PASS"
-
       - name: Read existing host and runner state
         shell: bash
         run: |
           set -euo pipefail
           umask 077
-          KEY="$RUNNER_TEMP/ogenic-wave-key"
-          printf '%s\n' "$SSH_PRIVATE_KEY" > "$KEY"
-          trap 'shred -u "$KEY" 2>/dev/null || rm -f "$KEY"' EXIT
-          ssh -i "$KEY" -o BatchMode=yes -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new wave@"$TARGET_HOST" '
-            set -e
-            echo "HOST=$(hostname)"
-            echo "USER=$(id -un)"
-            echo "RUNNER_DIR=$([ -d /opt/wave/actions-runner ] && echo present || echo missing)"
-            echo "RUNNER_CONFIG=$([ -f /opt/wave/actions-runner/.runner ] && echo present || echo missing)"
-            echo "SUDO_NONINTERACTIVE=$(sudo -n true >/dev/null 2>&1 && echo pass || echo fail)"
-            systemctl --no-pager --type=service | grep -i actions.runner || true
-          '
+          trap 'rm -f "$RUNNER_TEMP"/ogenic-wave-key-*' EXIT
+          connected=0
+          idx=0
+          for key_value in "${SSH_PRIVATE_KEY:-}" "${SSH_KEY:-}"; do
+            idx=$((idx+1))
+            [ -n "$key_value" ] || continue
+            key="$RUNNER_TEMP/ogenic-wave-key-$idx"
+            printf '%s\n' "$key_value" | tr -d '\r' > "$key"
+            chmod 600 "$key"
+            if ssh -i "$key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new wave@"$TARGET_HOST" '
+              set -e
+              echo "HOST=$(hostname)"
+              echo "USER=$(id -un)"
+              echo "RUNNER_DIR=$([ -d /opt/wave/actions-runner ] && echo present || echo missing)"
+              echo "RUNNER_CONFIG=$([ -f /opt/wave/actions-runner/.runner ] && echo present || echo missing)"
+              echo "SUDO_NONINTERACTIVE=$(sudo -n true >/dev/null 2>&1 && echo pass || echo fail)"
+              systemctl --no-pager --type=service | grep -i actions.runner || true
+            '; then
+              echo "SSH_BINDING_INDEX=$idx"
+              connected=1
+              break
+            fi
+          done
+          test "$connected" = 1 || { echo "::error::All approved wave SSH key bindings rejected"; exit 1; }
