@@ -56,6 +56,7 @@ jobs:
           source_auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN_OGE34" | base64 -w0)"
           target_auth="$(printf 'x-access-token:%s' "$GIT_HUB_RUNNER_2" | base64 -w0)"
           git -c "http.extraHeader=Authorization: Basic $source_auth" clone --mirror             "https://github.com/${SOURCE_REPOSITORY}.git" "$RUNNER_TEMP/source.git"
-          git -C "$RUNNER_TEMP/source.git"             -c "http.extraHeader=Authorization: Basic $target_auth" push --mirror             "https://github.com/${TARGET_REPOSITORY}.git"
+          git -C "$RUNNER_TEMP/source.git" for-each-ref --format='delete %(refname)' refs/pull/ | git -C "$RUNNER_TEMP/source.git" update-ref --stdin
+          git -C "$RUNNER_TEMP/source.git" -c "http.extraHeader=Authorization: Basic $target_auth" push --mirror "https://github.com/${TARGET_REPOSITORY}.git"
           unset source_auth target_auth
           echo "PRIVATE_MIRROR=PASS"
